@@ -1,7 +1,23 @@
 'use client';
 
 import { useState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { login, signup } from './actions';
+
+/** 送信中は「処理中…」表示＋無効化して、押下の反応をすぐ返す。 */
+function SubmitButton({ action, label }: { action: (formData: FormData) => void; label: string }) {
+  const { pending, action: pendingAction } = useFormStatus();
+  const isThis = pending && pendingAction === action;
+  return (
+    <button
+      formAction={action}
+      disabled={pending}
+      style={{ ...primaryBtn, opacity: pending ? 0.7 : 1, cursor: pending ? 'default' : 'pointer' }}
+    >
+      {isThis ? '処理中…' : label}
+    </button>
+  );
+}
 
 export default function LoginForm() {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
@@ -45,13 +61,9 @@ export default function LoginForm() {
       )}
 
       {isSignup ? (
-        <button formAction={signup} style={primaryBtn}>
-          新規アカウント作成
-        </button>
+        <SubmitButton action={signup} label="新規アカウント作成" />
       ) : (
-        <button formAction={login} style={primaryBtn}>
-          ログイン
-        </button>
+        <SubmitButton action={login} label="ログイン" />
       )}
 
       <button

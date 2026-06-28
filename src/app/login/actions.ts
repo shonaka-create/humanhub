@@ -36,10 +36,11 @@ function friendlyAuthError(message: string): string {
 
 export async function signup(formData: FormData) {
   const supabase = await createClient();
+  const email = String(formData.get('email') ?? '');
   const displayName = String(formData.get('display_name') ?? '').trim();
   const initial = (displayName[0] ?? 'U').toUpperCase();
   const { data, error } = await supabase.auth.signUp({
-    email: String(formData.get('email') ?? ''),
+    email,
     password: String(formData.get('password') ?? ''),
     options: {
       // 表示名はユーザーメタデータに保存し、サイドバー/挨拶文に反映する。
@@ -54,8 +55,8 @@ export async function signup(formData: FormData) {
     revalidatePath('/', 'layout');
     redirect('/');
   }
-  // 確認が有効な場合は確認メール待ち。
-  redirect('/login?message=signup');
+  // 確認が有効な場合は確認メール待ち → 確認案内画面へ。
+  redirect(`/login?message=signup&email=${encodeURIComponent(email)}`);
 }
 
 export async function signout() {
