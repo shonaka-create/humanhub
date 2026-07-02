@@ -253,13 +253,13 @@ function RunTab({
 
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 10 }}>
           {!confirmed && (
-            <button onClick={onCalc} disabled={pending} style={{ font: '600 12.5px var(--ui)', background: '#fff', color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: 999, padding: '9px 18px', cursor: pending ? 'default' : 'pointer', whiteSpace: 'nowrap' }}>
-              ↻ {run ? t.payrollRecalc : t.payrollCalc}
+            <button onClick={onCalc} disabled={pending} style={{ font: '600 12.5px var(--ui)', background: '#fff', color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: 999, padding: '9px 18px', cursor: pending ? 'default' : 'pointer', whiteSpace: 'nowrap', opacity: pending ? 0.7 : 1 }}>
+              {pending ? `⟳ ${t.payrollCalculating}` : `↻ ${run ? t.payrollRecalc : t.payrollCalc}`}
             </button>
           )}
           {run && !confirmed && (
-            <button onClick={onConfirm} disabled={pending} style={{ font: '600 12.5px var(--ui)', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 999, padding: '9px 18px', cursor: pending ? 'default' : 'pointer', whiteSpace: 'nowrap' }}>
-              {t.payrollConfirm}
+            <button onClick={onConfirm} disabled={pending} style={{ font: '600 12.5px var(--ui)', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 999, padding: '9px 18px', cursor: pending ? 'default' : 'pointer', whiteSpace: 'nowrap', opacity: pending ? 0.7 : 1 }}>
+              {pending ? t.payrollConfirming : t.payrollConfirm}
             </button>
           )}
           {run && confirmed && (
@@ -279,8 +279,8 @@ function RunTab({
       {!run ? (
         <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16, padding: '44px 24px', textAlign: 'center' }}>
           <div style={{ fontSize: 13, color: 'var(--ink2)', marginBottom: 18, lineHeight: 1.7 }}>{t.payrollNotRun}</div>
-          <button onClick={onCalc} disabled={pending} style={{ font: '700 13.5px var(--ui)', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 999, padding: '12px 26px', cursor: pending ? 'default' : 'pointer' }}>
-            ↻ {t.payrollCalc}
+          <button onClick={onCalc} disabled={pending} style={{ font: '700 13.5px var(--ui)', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 999, padding: '12px 26px', cursor: pending ? 'default' : 'pointer', opacity: pending ? 0.7 : 1 }}>
+            {pending ? `⟳ ${t.payrollCalculating}` : `↻ ${t.payrollCalc}`}
           </button>
         </div>
       ) : (

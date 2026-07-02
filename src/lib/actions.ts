@@ -56,6 +56,30 @@ export async function createCustomer(formData: FormData) {
   revalidatePath('/');
 }
 
+/** 既存顧客の基本情報（氏名・連絡先・担当・配色）を更新。 */
+export async function updateCustomer(formData: FormData) {
+  const id = str(formData, 'id');
+  const name = str(formData, 'name');
+  if (!id || !name) return;
+  const supabase = await createClient();
+  const tone = (str(formData, 'tone') || 'accent') as Tone;
+  const staffId = str(formData, 'primary_staff_id');
+  const { error } = await supabase
+    .from('customers')
+    .update({
+      name,
+      initial: initialOf(name),
+      tone,
+      email: str(formData, 'email') || null,
+      phone: str(formData, 'phone') || null,
+      primary_staff_id: staffId || null,
+    })
+    .eq('id', id);
+  if (error) throw error;
+  revalidatePath('/customers');
+  revalidatePath('/');
+}
+
 /** 顧客詳細のメモ追加。 */
 export async function addCustomerMemo(formData: FormData) {
   const customerId = str(formData, 'customer_id');
@@ -404,6 +428,35 @@ export async function createInventoryItem(formData: FormData) {
   revalidatePath('/');
 }
 
+/** 既存の資材（在庫アイテム）を編集。在庫/発注点から状態を再計算（発注済みは維持）。 */
+export async function updateInventoryItem(formData: FormData) {
+  const id = str(formData, 'id');
+  const name = str(formData, 'name');
+  if (!id || !name) return;
+  const supabase = await createClient();
+  const stock = num(formData, 'stock');
+  const reorderPt = num(formData, 'reorder_pt');
+  // 発注済みの間は状態を勝手に戻さない（入荷登録まで維持）。
+  const { data: cur } = await supabase.from('inventory_items').select('status').eq('id', id).maybeSingle();
+  const status =
+    cur?.status === 'ordered' ? 'ordered' : stock <= 0 ? 'order' : stock <= reorderPt ? 'low' : 'ok';
+  const { error } = await supabase
+    .from('inventory_items')
+    .update({
+      name,
+      category_key: str(formData, 'category_key') || 'catSupply',
+      stock,
+      capacity: num(formData, 'capacity') || stock,
+      reorder_pt: reorderPt,
+      status,
+      supplier: str(formData, 'supplier') || null,
+    })
+    .eq('id', id);
+  if (error) throw error;
+  revalidatePath('/inventory');
+  revalidatePath('/');
+}
+
 /** 在庫アイテムを「発注済み」にし、orders に1行追加する。 */
 export async function orderStockItem(formData: FormData) {
   const id = str(formData, 'id');
@@ -444,6 +497,26 @@ export async function createOrder(formData: FormData) {
   revalidatePath('/inventory');
 }
 
+/** 既存の発注（品名・数量・仕入先・発注日・入荷予定）を編集。 */
+export async function updateOrder(formData: FormData) {
+  const id = str(formData, 'id');
+  const item = str(formData, 'item');
+  if (!id || !item) return;
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('orders')
+    .update({
+      item,
+      qty: str(formData, 'qty') || '1',
+      supplier: str(formData, 'supplier') || '—',
+      order_date: str(formData, 'order_date') || new Date().toISOString().slice(0, 10),
+      eta: str(formData, 'eta') || null,
+    })
+    .eq('id', id);
+  if (error) throw error;
+  revalidatePath('/inventory');
+}
+
 /** 発注を「入荷済み」にする。 */
 export async function receiveOrder(formData: FormData) {
   const id = str(formData, 'id');
@@ -454,19 +527,68 @@ export async function receiveOrder(formData: FormData) {
   revalidatePath('/inventory');
 }
 
+/* ------------------------- PRO 無料トライアル ------------------------- */
+/** アクセス分析（PRO）の14日間無料トライアルを開始する。オーナー専用・1回のみ。 */
+export async function startProTrial() {
+  const me = await requireOwner();
+  const supabase = await createClient();
+  // 既に開始済みなら期間をリセットしない（再クリックでの延長を防ぐ）。
+  const { data: t } = await supabase
+    .from('tenants')
+    .select('pro_trial_started_at')
+    .eq('id', me.tenantId)
+    .maybeSingle();
+  if (t?.pro_trial_started_at) {
+    revalidatePath('/access');
+    return;
+  }
+  const { error } = await supabase
+    .from('tenants')
+    .update({ pro_trial_started_at: new Date().toISOString() })
+    .eq('id', me.tenantId);
+  if (error) throw error;
+  revalidatePath('/access');
+}
+
 /* ------------------------- 設定（スタッフ） ------------------------- */
 export async function createStaff(formData: FormData) {
   const name = str(formData, 'name');
   if (!name) return;
+  await requireOwner();
   const supabase = await createClient();
   const id = str(formData, 'id') || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || `staff-${Date.now()}`;
+  // email を入れておくと、同じメールで登録/招待されたアカウントと自動で紐付く（DB トリガー）。
   const { error } = await supabase.from('staff').insert({
     id,
     name,
     initial: str(formData, 'initial') || initialOf(name),
     tone: (str(formData, 'tone') || 'accent') as Tone,
     weekly_hours: num(formData, 'weekly_hours'),
+    email: str(formData, 'email').toLowerCase() || null,
   });
+  if (error) throw error;
+  revalidatePath('/settings');
+  revalidatePath('/shifts');
+  revalidatePath('/');
+}
+
+/** 既存スタッフの基本情報を更新（オーナー専用）。email を設定するとアカウントと自動紐付け。 */
+export async function updateStaff(formData: FormData) {
+  const id = str(formData, 'id');
+  const name = str(formData, 'name');
+  if (!id || !name) return;
+  await requireOwner();
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('staff')
+    .update({
+      name,
+      initial: str(formData, 'initial') || initialOf(name),
+      tone: (str(formData, 'tone') || 'accent') as Tone,
+      weekly_hours: num(formData, 'weekly_hours'),
+      email: str(formData, 'email').toLowerCase() || null,
+    })
+    .eq('id', id);
   if (error) throw error;
   revalidatePath('/settings');
   revalidatePath('/shifts');

@@ -91,6 +91,47 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   }
 }
 
+/** アクセス分析（PRO）の無料トライアル状態。 */
+export type ProAccess = {
+  /** トライアルを一度でも開始したか。 */
+  started: boolean;
+  /** 現在トライアル有効期間内か（＝PRO機能を開放してよいか）。 */
+  active: boolean;
+  /** 開始済みだが期間が切れているか。 */
+  expired: boolean;
+  /** 残り日数（有効時のみ、切り上げ）。 */
+  daysLeft: number;
+  /** オーナー（トライアルを開始できる権限）か。 */
+  canManage: boolean;
+};
+
+/** 無料トライアルの日数。 */
+export const PRO_TRIAL_DAYS = 14;
+
+/** ログイン中テナントの PRO 無料トライアル状態を返す。 */
+export async function getProAccess(): Promise<ProAccess> {
+  const base: ProAccess = { started: false, active: false, expired: false, daysLeft: 0, canManage: false };
+  const membership = await getMembership();
+  if (!membership) return base;
+  const canManage = membership.role === 'owner';
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('tenants')
+    .select('pro_trial_started_at')
+    .eq('id', membership.tenantId)
+    .maybeSingle();
+
+  const startedAt = data?.pro_trial_started_at ? new Date(data.pro_trial_started_at) : null;
+  if (!startedAt) return { ...base, canManage };
+
+  const end = new Date(startedAt.getTime() + PRO_TRIAL_DAYS * 86400000);
+  const now = new Date();
+  const active = now < end;
+  const daysLeft = active ? Math.ceil((end.getTime() - now.getTime()) / 86400000) : 0;
+  return { started: true, active, expired: !active, daysLeft, canManage };
+}
+
 /** 'YYYY-MM-DD' をローカル Date に（TZ ずれ防止）。 */
 function parseYmd(s: string): Date {
   const [y, m, d] = s.split('-').map(Number);
@@ -287,15 +328,19 @@ export async function getPayrollComputation(period: string): Promise<PayrollComp
     ratesByStaff.set(r.staff_id, arr);
   }
   // 勤務日時点で有効な時給（effective_from <= 日付 の最新、降順配列の先頭一致）。
+  // 勤務日が最古のレートより前（例: 適用開始日を「今日」にしたのに、その前日のシフトを計算）でも
+  // 「設定した時給が反映されない＝基本給¥0」になると直感に反するため、その場合は最古のレートを適用する。
   const wageOn = (staffId: string, date: string): number => {
     const arr = ratesByStaff.get(staffId) ?? [];
-    return arr.find((r) => r.effectiveFrom <= date)?.wage ?? 0;
+    if (arr.length === 0) return 0;
+    return (arr.find((r) => r.effectiveFrom <= date) ?? arr[arr.length - 1]).wage;
   };
-  // 月末時点で有効な手当（月額）。
+  // 月末時点で有効な手当（月額）。時給と同様、それ以前しかレートが無ければ最古を適用する。
   const allowanceOf = (staffId: string): number => {
     const arr = ratesByStaff.get(staffId) ?? [];
-    const r = arr.find((x) => x.effectiveFrom <= end);
-    return r ? r.commute + r.other : 0;
+    if (arr.length === 0) return 0;
+    const r = arr.find((x) => x.effectiveFrom <= end) ?? arr[arr.length - 1];
+    return r.commute + r.other;
   };
 
   const acc = new Map<string, { workedMin: number; basePay: number }>();
@@ -427,7 +472,7 @@ export async function getStaff(): Promise<Staff[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('staff')
-    .select('id, name, initial, tone, weekly_hours')
+    .select('id, name, initial, tone, weekly_hours, email, user_id')
     .order('created_at', { ascending: true });
   if (error) throw error;
   return (data ?? []).map((r) => ({
@@ -436,6 +481,8 @@ export async function getStaff(): Promise<Staff[]> {
     initial: r.initial,
     tone: r.tone as Tone,
     weeklyHours: r.weekly_hours,
+    email: r.email ?? '',
+    linked: !!r.user_id,
   }));
 }
 
@@ -559,6 +606,8 @@ export async function getOrders(): Promise<OrderRow[]> {
     supplier: o.supplier,
     orderDate: md(o.order_date),
     eta: o.eta ? md(o.eta) : '',
+    orderDateISO: o.order_date ?? '',
+    etaISO: o.eta ?? '',
     status: o.status as OrderRow['status'],
   }));
 }
@@ -671,7 +720,7 @@ export async function getCustomerDetail(id?: string): Promise<CustomerDetail | n
   let q = supabase
     .from('customers')
     .select(
-      'id, initial, name, tone, email, phone, visits, last_visit, lifetime_spend, primary_staff:staff!primary_staff_id(initial,name,tone)',
+      'id, initial, name, tone, email, phone, visits, last_visit, lifetime_spend, primary_staff_id, primary_staff:staff!primary_staff_id(initial,name,tone)',
     );
   q = id ? q.eq('id', id) : q.order('last_visit', { ascending: false });
   const { data, error } = await q.limit(1).maybeSingle();
@@ -699,6 +748,7 @@ export async function getCustomerDetail(id?: string): Promise<CustomerDetail | n
     visits: data.visits,
     lastVisit: data.last_visit ? md(data.last_visit) : '—',
     spend: data.lifetime_spend != null ? `$${Number(data.lifetime_spend).toLocaleString('en-US')}` : '—',
+    primaryStaffId: data.primary_staff_id ?? '',
     primaryStaff: {
       initial: ps?.initial ?? '',
       name: ps?.name ?? '',
@@ -713,7 +763,7 @@ export async function getCustomerDetail(id?: string): Promise<CustomerDetail | n
   };
 }
 
-export type BookingColumnStaff = { initial: string; name: string; tone: Tone };
+export type BookingColumnStaff = { initial: string; name: string; tone: Tone; unassigned?: boolean };
 
 /** 30分=1スロット。9:00 を rowStart 2 とするグリッド行番号を返す。 */
 function rowStartFromTime(t: string): number {
@@ -721,34 +771,46 @@ function rowStartFromTime(t: string): number {
   return 2 + (h - 9) * 2 + (m >= 30 ? 1 : 0);
 }
 
-/** 指定日（既定: 今日）の予約タイムライン。スタッフ列とブロックを返す。 */
+/**
+ * 指定日（既定: 今日）の予約タイムライン。スタッフ列とブロックを返す。
+ * staffId を渡すと、そのスタッフの予約だけに絞り込む（＝スタッフ別表示）。
+ * 未指定なら店舗全体（全スタッフ）を表示する。
+ */
 export async function getBookings(
   date = ymd(new Date()),
+  staffId?: string,
 ): Promise<{ staff: BookingColumnStaff[]; blocks: BookingBlock[] }> {
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from('bookings')
     .select('id, start_time, duration_min, customer_name, service_key, tone, staff(id, initial, name, tone)')
-    .eq('booking_date', date)
-    .order('start_time', { ascending: true });
+    .eq('booking_date', date);
+  if (staffId) query = query.eq('staff_id', staffId);
+  const { data, error } = await query.order('start_time', { ascending: true });
   if (error) throw error;
 
   const columns: BookingColumnStaff[] = [];
   const colIndex = new Map<string, number>();
   const blocks: BookingBlock[] = [];
+  // 指名なし（staff 未割当）の予約もタイムラインに出す。専用の1列にまとめる。
+  const UNASSIGNED = '__unassigned__';
 
   for (const b of data ?? []) {
     const rel = b.staff as unknown;
     const st = (Array.isArray(rel) ? rel[0] : rel) as
       | { id: string; initial: string; name: string; tone: Tone }
       | null;
-    if (!st) continue;
 
-    if (!colIndex.has(st.id)) {
-      colIndex.set(st.id, columns.length);
-      columns.push({ initial: st.initial, name: st.name, tone: st.tone });
+    const key = st?.id ?? UNASSIGNED;
+    if (!colIndex.has(key)) {
+      colIndex.set(key, columns.length);
+      columns.push(
+        st
+          ? { initial: st.initial, name: st.name, tone: st.tone }
+          : { initial: '—', name: '', tone: 'sage', unassigned: true },
+      );
     }
-    const col = colIndex.get(st.id)! + 1; // 1-based
+    const col = colIndex.get(key)! + 1; // 1-based
 
     blocks.push({
       id: b.id,
@@ -760,6 +822,16 @@ export async function getBookings(
       serviceKey: (b.service_key ?? undefined) as BookingBlock['serviceKey'],
       tone: b.tone as Tone,
     });
+  }
+
+  // スタッフで絞り込んでいて、その日の予約が0件でも本人の列は表示する（空の枠を出す）。
+  if (staffId && !colIndex.has(staffId)) {
+    const { data: s } = await supabase
+      .from('staff')
+      .select('initial, name, tone')
+      .eq('id', staffId)
+      .maybeSingle();
+    if (s) columns.push({ initial: s.initial, name: s.name, tone: s.tone as Tone });
   }
 
   return { staff: columns, blocks };

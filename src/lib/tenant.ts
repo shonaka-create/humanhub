@@ -26,6 +26,19 @@ type PendingMeta = {
   pending_invite_token?: string;
 };
 
+/**
+ * 招待コード入力の正規化。
+ * 招待リンク全体（https://.../login?invite=TOKEN）や `?invite=TOKEN` を貼られても
+ * トークン部分だけを取り出す。素のトークンならそのまま返す。
+ */
+export function normalizeInviteToken(raw: string | null | undefined): string {
+  const v = (raw ?? '').trim();
+  if (!v) return '';
+  const m = v.match(/[?&]invite=([^&\s#]+)/i);
+  if (m) return decodeURIComponent(m[1]).trim();
+  return v;
+}
+
 /** ログイン中ユーザーの membership を返す（無ければ ensure で作成を試みる）。 */
 export async function getMembership(): Promise<Membership | null> {
   const supabase = await createClient();
@@ -163,7 +176,8 @@ export async function ensureMembership(user: User): Promise<Membership | null> {
   const displayName = (meta.display_name || email.split('@')[0] || 'User').trim();
 
   // --- 招待トークン経由の参加 ---
-  const token = meta.pending_invite_token?.trim();
+  // 過去にURL丸ごと保存されたケースもあるため、ここでも正規化してから照合する。
+  const token = normalizeInviteToken(meta.pending_invite_token);
   if (token) {
     const { data: invite } = await admin
       .from('invites')
@@ -196,6 +210,10 @@ export async function ensureMembership(user: User): Promise<Membership | null> {
           email: created.email ?? '',
         };
       }
+      // insert 失敗（同時多重実行で別リクエストが先に作成済み＝user_id ユニーク違反など）
+      // → 新規オーナー作成にフォールバックせず、既に出来ている membership を採用する。
+      const raced = await readMembership(user.id);
+      if (raced) return raced;
     }
     // 招待が無効／期限切れ／使用済みの場合は、下の新規オーナー作成にフォールバックする。
   }
@@ -220,7 +238,12 @@ export async function ensureMembership(user: User): Promise<Membership | null> {
     })
     .select('tenant_id, role, display_name, email')
     .single();
-  if (mErr || !created) return null;
+  if (mErr || !created) {
+    // 同時多重実行で別リクエストが先に membership を作成済みの可能性（user_id ユニーク違反）。
+    // このリクエストが作ってしまった孤児テナントを片付け、既存の membership を返す。
+    await admin.from('tenants').delete().eq('id', tenant.id);
+    return readMembership(user.id);
+  }
 
   return {
     tenantId: created.tenant_id,

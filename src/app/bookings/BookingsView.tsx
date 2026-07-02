@@ -35,11 +35,13 @@ export function BookingsView({
   staff,
   blocks,
   staffOptions,
+  selectedStaffId,
 }: {
   date: string;
-  staff: { initial: string; name: string; tone: Tone }[];
+  staff: { initial: string; name: string; tone: Tone; unassigned?: boolean }[];
   blocks: BookingBlock[];
   staffOptions: Staff[];
+  selectedStaffId: string;
 }) {
   const { t, lang } = useLang();
   const router = useRouter();
@@ -48,7 +50,10 @@ export function BookingsView({
 
   const current = parseYmd(date);
   const isToday = date === todayStr();
-  const goTo = (d: Date) => router.push(`/bookings?date=${ymd(d)}`);
+  // 日付・スタッフフィルタを保ったまま遷移する。
+  const urlFor = (d: string, staffId: string) =>
+    `/bookings?date=${d}${staffId ? `&staff=${staffId}` : ''}`;
+  const goTo = (d: Date) => router.push(urlFor(ymd(d), selectedStaffId));
   const shiftDay = (delta: number) => {
     const d = new Date(current);
     d.setDate(d.getDate() + delta);
@@ -86,7 +91,22 @@ export function BookingsView({
         <span style={{ fontFamily: 'var(--serif)', fontSize: 22, fontWeight: 600 }}>{dayLabel}</span>
         <button onClick={() => shiftDay(1)} style={navBtn} aria-label="next day">›</button>
         <button onClick={() => goTo(new Date())} style={{ font: '500 12px var(--ui)', border: '1px solid var(--line)', background: isToday ? 'var(--accent-soft)' : '#fff', borderRadius: 999, padding: '6px 14px', cursor: 'pointer', color: isToday ? 'var(--accent)' : 'var(--ink2)' }}>{t.today}</button>
-        <button onClick={() => setOpen(true)} style={{ marginLeft: 'auto', font: '600 12.5px var(--ui)', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 999, padding: '9px 18px', cursor: 'pointer' }}>＋ {t.newBooking}</button>
+
+        {/* 表示フィルタ: 店舗全体 or 登録スタッフ別 */}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 12, color: 'var(--ink3)', whiteSpace: 'nowrap' }}>{t.bookingFilterLabel}</span>
+          <select
+            value={selectedStaffId}
+            onChange={(e) => router.push(urlFor(date, e.target.value))}
+            style={{ border: '1px solid var(--line)', borderRadius: 999, padding: '7px 12px', font: '500 12.5px var(--ui)', color: 'var(--ink)', background: '#fff', cursor: 'pointer' }}
+          >
+            <option value="">{t.bookingAllStaff}</option>
+            {staffOptions.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        </div>
+        <button onClick={() => setOpen(true)} style={{ font: '600 12.5px var(--ui)', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 999, padding: '9px 18px', cursor: 'pointer' }}>＋ {t.newBooking}</button>
       </div>
 
       <Modal open={open} onClose={() => setOpen(false)} title={t.addBookingTitle}>
@@ -149,7 +169,7 @@ export function BookingsView({
               >
                 {s.initial}
               </div>
-              <span style={{ fontSize: 12.5, fontWeight: 500 }}>{s.name}</span>
+              <span style={{ fontSize: 12.5, fontWeight: 500, color: s.unassigned ? 'var(--ink3)' : undefined }}>{s.unassigned ? t.bookingUnassigned : s.name}</span>
             </div>
           ))}
 

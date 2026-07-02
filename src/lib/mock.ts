@@ -20,12 +20,12 @@ import type {
 } from './types';
 
 export const staff: Staff[] = [
-  { id: 'emma', name: 'Emma', initial: 'E', tone: 'sage', weeklyHours: 32 },
-  { id: 'aoi', name: 'Aoi', initial: 'A', tone: 'accent', weeklyHours: 30 },
-  { id: 'mei', name: 'Mei', initial: 'M', tone: 'rose', weeklyHours: 24 },
-  { id: 'yuki', name: 'Yuki', initial: 'Y', tone: 'accent', weeklyHours: 38 },
-  { id: 'liam', name: 'Liam', initial: 'L', tone: 'sage', weeklyHours: 26 },
-  { id: 'sophie', name: 'Sophie', initial: 'S', tone: 'sage', weeklyHours: 20 },
+  { id: 'emma', name: 'Emma', initial: 'E', tone: 'sage', weeklyHours: 32, email: '', linked: false },
+  { id: 'aoi', name: 'Aoi', initial: 'A', tone: 'accent', weeklyHours: 30, email: '', linked: false },
+  { id: 'mei', name: 'Mei', initial: 'M', tone: 'rose', weeklyHours: 24, email: '', linked: false },
+  { id: 'yuki', name: 'Yuki', initial: 'Y', tone: 'accent', weeklyHours: 38, email: '', linked: false },
+  { id: 'liam', name: 'Liam', initial: 'L', tone: 'sage', weeklyHours: 26, email: '', linked: false },
+  { id: 'sophie', name: 'Sophie', initial: 'S', tone: 'sage', weeklyHours: 20, email: '', linked: false },
 ];
 
 export const todaySchedule: ScheduleEntry[] = [
@@ -177,6 +177,7 @@ export const customerDetail: CustomerDetail = {
   visits: 1,
   lastVisit: '6/24',
   spend: '$165',
+  primaryStaffId: '',
   primaryStaff: { initial: 'E', name: 'Emma', tone: 'sage' },
   memos: [
     { date: '6/24', staff: 'Emma', tone: 'sage', text: '初回来店。アッシュ系のカラーをご希望。ブリーチ未経験のため、次回はトーンダウンを提案。仕上がりにご満足いただけた様子。' },
@@ -197,11 +198,11 @@ export const stockItems: StockItem[] = [
 ];
 
 export const orderRows: OrderRow[] = [
-  { id: 'o1', item: 'カラー剤 6N', qty: '20', supplier: 'B-Cosme', orderDate: '6/26', eta: '6/29', status: 'shipping' },
-  { id: 'o2', item: 'アルミホイル', qty: '10箱', supplier: 'SalonPro', orderDate: '6/26', eta: '6/28', status: 'shipping' },
-  { id: 'o3', item: 'ヘアオイル（店販）', qty: '12', supplier: 'Aroma Co.', orderDate: '6/27', eta: '7/1', status: 'ordered' },
-  { id: 'o4', item: 'トリートメント剤', qty: '12', supplier: 'B-Cosme', orderDate: '6/24', eta: '6/27', status: 'arrived' },
-  { id: 'o5', item: 'シャンプー（業務用）', qty: '24', supplier: 'SalonPro', orderDate: '6/20', eta: '6/23', status: 'arrived' },
+  { id: 'o1', item: 'カラー剤 6N', qty: '20', supplier: 'B-Cosme', orderDate: '6/26', eta: '6/29', orderDateISO: '2026-06-26', etaISO: '2026-06-29', status: 'shipping' },
+  { id: 'o2', item: 'アルミホイル', qty: '10箱', supplier: 'SalonPro', orderDate: '6/26', eta: '6/28', orderDateISO: '2026-06-26', etaISO: '2026-06-28', status: 'shipping' },
+  { id: 'o3', item: 'ヘアオイル（店販）', qty: '12', supplier: 'Aroma Co.', orderDate: '6/27', eta: '7/1', orderDateISO: '2026-06-27', etaISO: '2026-07-01', status: 'ordered' },
+  { id: 'o4', item: 'トリートメント剤', qty: '12', supplier: 'B-Cosme', orderDate: '6/24', eta: '6/27', orderDateISO: '2026-06-24', etaISO: '2026-06-27', status: 'arrived' },
+  { id: 'o5', item: 'シャンプー（業務用）', qty: '24', supplier: 'SalonPro', orderDate: '6/20', eta: '6/23', orderDateISO: '2026-06-20', etaISO: '2026-06-23', status: 'arrived' },
 ];
 
 // ---- Sales ----

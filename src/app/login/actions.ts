@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { ensureMembership } from '@/lib/tenant';
+import { ensureMembership, normalizeInviteToken } from '@/lib/tenant';
 
 export async function login(formData: FormData) {
   const supabase = await createClient();
@@ -41,7 +41,8 @@ export async function signup(formData: FormData) {
   const displayName = String(formData.get('display_name') ?? '').trim();
   const initial = (displayName[0] ?? 'U').toUpperCase();
   const salonName = String(formData.get('salon_name') ?? '').trim();
-  const inviteToken = String(formData.get('invite_token') ?? '').trim();
+  // リンク全体や ?invite=... を貼られてもトークンだけを取り出して保存する。
+  const inviteToken = normalizeInviteToken(String(formData.get('invite_token') ?? ''));
   const { data, error } = await supabase.auth.signUp({
     email,
     password: String(formData.get('password') ?? ''),

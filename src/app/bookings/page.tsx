@@ -12,10 +12,21 @@ function safeDate(v: string | string[] | undefined): string {
 export default async function BookingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string }>;
+  searchParams: Promise<{ date?: string; staff?: string }>;
 }) {
-  const { date } = await searchParams;
+  const { date, staff: staffParam } = await searchParams;
   const day = safeDate(date);
-  const [{ staff, blocks }, staffOptions] = await Promise.all([getBookings(day), getStaff()]);
-  return <BookingsView date={day} staff={staff} blocks={blocks} staffOptions={staffOptions} />;
+  const staffOptions = await getStaff();
+  // 有効なスタッフIDのみフィルタとして採用（不正値は店舗全体表示にフォールバック）。
+  const selectedStaffId = staffOptions.some((s) => s.id === staffParam) ? staffParam! : '';
+  const { staff, blocks } = await getBookings(day, selectedStaffId || undefined);
+  return (
+    <BookingsView
+      date={day}
+      staff={staff}
+      blocks={blocks}
+      staffOptions={staffOptions}
+      selectedStaffId={selectedStaffId}
+    />
+  );
 }

@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react';
 import { useLang } from '@/i18n/LangProvider';
 import { Field, FieldRow, FormActions, Modal, Select, TextInput } from '@/components/Modal';
 import { toneStyles } from '@/lib/tones';
-import { createInventoryItem, createOrder, orderStockItem, receiveOrder } from '@/lib/actions';
+import { createInventoryItem, createOrder, orderStockItem, receiveOrder, updateInventoryItem, updateOrder } from '@/lib/actions';
 import { CATEGORY_KEYS } from '@/lib/formOptions';
 import type { InventoryStatus, OrderRow, OrderStatus, StockItem } from '@/lib/types';
 
@@ -123,6 +123,15 @@ function StatusLegend() {
 
 function StockTable({ stockItems }: { stockItems: StockItem[] }) {
   const { t } = useLang();
+  const [edit, setEdit] = useState<StockItem | null>(null);
+  const [editPending, startEdit] = useTransition();
+
+  function submitEdit(formData: FormData) {
+    startEdit(async () => {
+      await updateInventoryItem(formData);
+      setEdit(null);
+    });
+  }
 
   const statusChip: Record<InventoryStatus, { label: string; bg: string; color: string; dot: string }> = {
     order: { label: t.stOrder, bg: 'var(--rose-soft)', color: '#8A4E47', dot: 'var(--rose)' },
@@ -135,7 +144,30 @@ function StockTable({ stockItems }: { stockItems: StockItem[] }) {
     s === 'order' ? 'solid' : s === 'low' ? 'outline' : null;
 
   return (
-    <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16, padding: '14px 24px 16px', boxShadow: '0 1px 2px rgba(46,42,37,.04)' }}>
+    <>
+      {edit && (
+        <Modal open onClose={() => setEdit(null)} title={t.editItemTitle}>
+          <form action={submitEdit}>
+            <input type="hidden" name="id" value={edit.id} />
+            <Field label={t.formName}><TextInput name="name" required placeholder={t.formName} defaultValue={edit.name} /></Field>
+            <Field label={t.formCategory}>
+              <Select name="category_key" defaultValue={edit.categoryKey}>
+                {CATEGORY_KEYS.map((k) => (
+                  <option key={k} value={k}>{t[k]}</option>
+                ))}
+              </Select>
+            </Field>
+            <Field label={t.invSupplier}><TextInput name="supplier" placeholder={t.invSupplier} defaultValue={edit.supplier} /></Field>
+            <FieldRow>
+              <Field label={t.formStock}><TextInput type="number" name="stock" min={0} defaultValue={edit.stock} /></Field>
+              <Field label={t.formCapacity}><TextInput type="number" name="capacity" min={0} defaultValue={edit.capacity} /></Field>
+            </FieldRow>
+            <Field label={t.formReorderPt}><TextInput type="number" name="reorder_pt" min={0} defaultValue={edit.reorderPt} /></Field>
+            <FormActions cancelLabel={t.formCancel} saveLabel={t.formSave} onCancel={() => setEdit(null)} pending={editPending} />
+          </form>
+        </Modal>
+      )}
+      <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16, padding: '14px 24px 16px', boxShadow: '0 1px 2px rgba(46,42,37,.04)' }}>
       <StatusLegend />
       <div className="scroll-x">
         <div style={{ minWidth: 720 }}>
@@ -174,7 +206,14 @@ function StockTable({ stockItems }: { stockItems: StockItem[] }) {
                 {chip.label}
               </span>
             </div>
-            <div style={{ textAlign: 'right' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => setEdit(item)}
+                style={{ font: '500 11.5px var(--ui)', background: '#fff', color: 'var(--ink2)', border: '1px solid var(--line)', borderRadius: 999, padding: '7px 13px', cursor: 'pointer' }}
+              >
+                {t.staffEdit}
+              </button>
               {action ? (
                 <form action={orderStockItem} style={{ display: 'inline' }}>
                   <input type="hidden" name="id" value={item.id} />
@@ -204,11 +243,21 @@ function StockTable({ stockItems }: { stockItems: StockItem[] }) {
         </div>
       </div>
     </div>
+    </>
   );
 }
 
 function OrdersTable({ orderRows }: { orderRows: OrderRow[] }) {
   const { t } = useLang();
+  const [edit, setEdit] = useState<OrderRow | null>(null);
+  const [editPending, startEdit] = useTransition();
+
+  function submitEdit(formData: FormData) {
+    startEdit(async () => {
+      await updateOrder(formData);
+      setEdit(null);
+    });
+  }
 
   const statusChip: Record<OrderStatus, { label: string; bg: string; color: string; dot: string; border?: string }> = {
     shipping: { label: t.ordStShipping, bg: 'var(--accent-soft)', color: '#6E5142', dot: 'var(--accent)' },
@@ -217,7 +266,25 @@ function OrdersTable({ orderRows }: { orderRows: OrderRow[] }) {
   };
 
   return (
-    <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16, padding: '8px 24px 16px', boxShadow: '0 1px 2px rgba(46,42,37,.04)' }}>
+    <>
+      {edit && (
+        <Modal open onClose={() => setEdit(null)} title={t.editOrderTitle}>
+          <form action={submitEdit}>
+            <input type="hidden" name="id" value={edit.id} />
+            <Field label={t.ordItem}><TextInput name="item" required placeholder={t.ordItem} defaultValue={edit.item} /></Field>
+            <FieldRow>
+              <Field label={t.formQty}><TextInput name="qty" placeholder="1" defaultValue={edit.qty} /></Field>
+              <Field label={t.invSupplier}><TextInput name="supplier" placeholder={t.invSupplier} defaultValue={edit.supplier} /></Field>
+            </FieldRow>
+            <FieldRow>
+              <Field label={t.formOrderDate}><TextInput type="date" name="order_date" defaultValue={edit.orderDateISO} /></Field>
+              <Field label={t.formEta}><TextInput type="date" name="eta" defaultValue={edit.etaISO} /></Field>
+            </FieldRow>
+            <FormActions cancelLabel={t.formCancel} saveLabel={t.formSave} onCancel={() => setEdit(null)} pending={editPending} />
+          </form>
+        </Modal>
+      )}
+      <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16, padding: '8px 24px 16px', boxShadow: '0 1px 2px rgba(46,42,37,.04)' }}>
       <div className="scroll-x">
         <div style={{ minWidth: 760 }}>
       <div style={{ display: 'grid', gridTemplateColumns: ORDER_COLS, gap: 14, padding: '14px 0', fontSize: 11, letterSpacing: 0.5, color: 'var(--ink2)', textTransform: 'uppercase', borderBottom: '1px solid var(--line)' }}>
@@ -242,7 +309,14 @@ function OrdersTable({ orderRows }: { orderRows: OrderRow[] }) {
                 {chip.label}
               </span>
             </div>
-            <div style={{ textAlign: 'right' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => setEdit(o)}
+                style={{ font: '500 11.5px var(--ui)', background: '#fff', color: 'var(--ink2)', border: '1px solid var(--line)', borderRadius: 999, padding: '7px 13px', cursor: 'pointer' }}
+              >
+                {t.staffEdit}
+              </button>
               {canReceive ? (
                 <form action={receiveOrder} style={{ display: 'inline' }}>
                   <input type="hidden" name="id" value={o.id} />
@@ -258,5 +332,6 @@ function OrdersTable({ orderRows }: { orderRows: OrderRow[] }) {
         </div>
       </div>
     </div>
+    </>
   );
 }

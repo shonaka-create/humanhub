@@ -6,7 +6,7 @@ import { useLang } from '@/i18n/LangProvider';
 import { Avatar } from '@/components/ui';
 import { Field, FieldRow, FormActions, Modal, Select, TextInput } from '@/components/Modal';
 import { toneStyles } from '@/lib/tones';
-import { addCustomerMemo, createCustomer } from '@/lib/actions';
+import { addCustomerMemo, createCustomer, updateCustomer } from '@/lib/actions';
 import { TONE_OPTIONS } from '@/lib/formOptions';
 import type { CustomerDetail, CustomerListItem, Staff } from '@/lib/types';
 
@@ -41,7 +41,9 @@ function DetailView({ customerCount, customerList, customerDetail, staff, onBulk
   const [filter, setFilter] = useState<Filter>('all');
   const [query, setQuery] = useState('');
   const [addOpen, setAddOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [pending, start] = useTransition();
+  const [editPending, startEdit] = useTransition();
   const [memoPending, startMemo] = useTransition();
 
   const visibleCustomers = useMemo(() => {
@@ -58,6 +60,13 @@ function DetailView({ customerCount, customerList, customerDetail, staff, onBulk
     start(async () => {
       await createCustomer(formData);
       setAddOpen(false);
+    });
+  }
+
+  function submitEdit(formData: FormData) {
+    startEdit(async () => {
+      await updateCustomer(formData);
+      setEditOpen(false);
     });
   }
 
@@ -96,6 +105,36 @@ function DetailView({ customerCount, customerList, customerDetail, staff, onBulk
           <FormActions cancelLabel={t.formCancel} saveLabel={t.formSave} onCancel={() => setAddOpen(false)} pending={pending} />
         </form>
       </Modal>
+      {d && (
+        <Modal open={editOpen} onClose={() => setEditOpen(false)} title={t.editCustomerTitle}>
+          <form action={submitEdit}>
+            <input type="hidden" name="id" value={d.id} />
+            <Field label={t.formName}><TextInput name="name" required placeholder={t.formName} defaultValue={d.name} /></Field>
+            <FieldRow>
+              <Field label={t.formEmail}><TextInput type="email" name="email" placeholder="name@example.com" defaultValue={d.email} /></Field>
+              <Field label={t.formPhone}><TextInput name="phone" placeholder="090-0000-0000" defaultValue={d.phone} /></Field>
+            </FieldRow>
+            <FieldRow>
+              <Field label={t.formStaffOptional}>
+                <Select name="primary_staff_id" defaultValue={d.primaryStaffId}>
+                  <option value="">{t.formNone}</option>
+                  {staff.map((s) => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label={t.formTone}>
+                <Select name="tone" defaultValue={d.tone}>
+                  {TONE_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{t[o.labelKey]}</option>
+                  ))}
+                </Select>
+              </Field>
+            </FieldRow>
+            <FormActions cancelLabel={t.formCancel} saveLabel={t.formSave} onCancel={() => setEditOpen(false)} pending={editPending} />
+          </form>
+        </Modal>
+      )}
       <div className="toolbar" style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
           <span style={{ fontFamily: 'var(--serif)', fontSize: 21, fontWeight: 600 }}>{t.custCountLabel} {customerCount.total}</span>
@@ -194,7 +233,10 @@ function DetailView({ customerCount, customerList, customerDetail, staff, onBulk
                     <span>☎ {d.phone}</span>
                   </div>
                 </div>
-                <button style={{ font: '600 12.5px var(--ui)', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 999, padding: '9px 18px', cursor: 'pointer', whiteSpace: 'nowrap' }}>{t.btnSendThanks}</button>
+                <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                  <button onClick={() => setEditOpen(true)} style={{ font: '500 12.5px var(--ui)', background: '#fff', color: 'var(--ink2)', border: '1px solid var(--line)', borderRadius: 999, padding: '9px 16px', cursor: 'pointer', whiteSpace: 'nowrap' }}>{t.staffEdit}</button>
+                  <button style={{ font: '600 12.5px var(--ui)', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 999, padding: '9px 18px', cursor: 'pointer', whiteSpace: 'nowrap' }}>{t.btnSendThanks}</button>
+                </div>
               </div>
               <div className="grid-stats-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginTop: 20 }}>
                 <Stat label={t.custVisits} value={<>{d.visits} <span style={{ fontSize: 12, color: 'var(--ink3)' }}>{t.uVisit}</span></>} />
@@ -282,7 +324,7 @@ function DetailView({ customerCount, customerList, customerDetail, staff, onBulk
                   <div style={{ padding: 13 }}>
                     <div style={{ fontSize: 10.5, color: 'var(--ink3)' }}>{t.emailSubjectL}</div>
                     <div style={{ fontSize: 13, fontWeight: 500, fontFamily: 'var(--serif)', margin: '2px 0 10px' }}>{t.emailSubjectText}</div>
-                    <div style={{ fontSize: 11.5, lineHeight: 1.6, color: 'var(--ink2)' }}>{t.emailBody}</div>
+                    <div style={{ fontSize: 11.5, lineHeight: 1.6, color: 'var(--ink2)' }}>{t.emailBody.replace('{name}', d.name)}</div>
                   </div>
                 </div>
                 <button style={{ width: '100%', marginTop: 16, font: '600 12.5px var(--ui)', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 999, padding: 11, cursor: 'pointer' }}>{t.btnSendRevisit}</button>

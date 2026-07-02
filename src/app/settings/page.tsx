@@ -12,7 +12,7 @@ export default async function SettingsPage() {
 
   return (
     <>
-      <SettingsView staff={staff} />
+      <SettingsView staff={staff} canManage={members.canManage} />
       <MembersPanel bundle={members} baseUrl={baseUrl} />
     </>
   );

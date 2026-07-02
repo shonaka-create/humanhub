@@ -19,6 +19,10 @@ export type Staff = {
   initial: string;
   tone: Tone;
   weeklyHours: number;
+  /** 紐付け用メールアドレス（memberships.email と一致すると自動でアカウント紐付け）。 */
+  email: string;
+  /** ログインアカウントと紐付け済みか（staff.user_id が設定されている）。 */
+  linked: boolean;
 };
 
 /** 給与テーブル1件（スタッフ×適用開始日）。金額は円。 */
@@ -149,6 +153,7 @@ export type CustomerDetail = {
   visits: number;
   lastVisit: string;
   spend: string;
+  primaryStaffId: string;
   primaryStaff: { initial: string; name: string; tone: Tone };
   memos: CustomerMemo[];
 };
@@ -174,8 +179,12 @@ export type OrderRow = {
   item: string;
   qty: string;
   supplier: string;
+  /** 表示用（'M/D'）。編集フォームには *ISO を使う。 */
   orderDate: string;
   eta: string;
+  /** 'YYYY-MM-DD'（date input 用の生値）。 */
+  orderDateISO: string;
+  etaISO: string;
   status: OrderStatus;
 };
 

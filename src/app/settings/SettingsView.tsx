@@ -4,19 +4,21 @@ import { useState, useTransition } from 'react';
 import { useLang } from '@/i18n/LangProvider';
 import { Avatar } from '@/components/ui';
 import { Field, FieldRow, FormActions, Modal, Select, TextInput } from '@/components/Modal';
-import { createStaff } from '@/lib/actions';
+import { createStaff, updateStaff } from '@/lib/actions';
 import { TONE_OPTIONS } from '@/lib/formOptions';
 import type { Staff } from '@/lib/types';
 
-export function SettingsView({ staff }: { staff: Staff[] }) {
+export function SettingsView({ staff, canManage }: { staff: Staff[]; canManage: boolean }) {
   const { t } = useLang();
-  const [open, setOpen] = useState(false);
+  // null=閉じている / 'new'=追加 / Staff=編集。
+  const [editing, setEditing] = useState<'new' | Staff | null>(null);
   const [pending, start] = useTransition();
+  const current = editing === 'new' ? null : editing;
 
   function submit(formData: FormData) {
     start(async () => {
-      await createStaff(formData);
-      setOpen(false);
+      await (current ? updateStaff(formData) : createStaff(formData));
+      setEditing(null);
     });
   }
 
@@ -27,24 +29,30 @@ export function SettingsView({ staff }: { staff: Staff[] }) {
           <div style={{ fontFamily: 'var(--serif)', fontSize: 22, fontWeight: 600 }}>{t.settingsStaffTitle}</div>
           <div style={{ fontSize: 12, color: 'var(--ink2)', marginTop: 3 }}>{t.settingsStaffDesc}</div>
         </div>
-        <button onClick={() => setOpen(true)} style={{ marginLeft: 'auto', font: '600 12.5px var(--ui)', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 999, padding: '9px 18px', cursor: 'pointer' }}>＋ {t.settingsAddStaff}</button>
+        {canManage && (
+          <button onClick={() => setEditing('new')} style={{ marginLeft: 'auto', font: '600 12.5px var(--ui)', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 999, padding: '9px 18px', cursor: 'pointer' }}>＋ {t.settingsAddStaff}</button>
+        )}
       </div>
 
-      <Modal open={open} onClose={() => setOpen(false)} title={t.addStaffTitle}>
-        <form action={submit}>
-          <Field label={t.formName}><TextInput name="name" required placeholder={t.formName} /></Field>
+      <Modal open={editing !== null} onClose={() => setEditing(null)} title={current ? t.editStaffTitle : t.addStaffTitle}>
+        {/* key で追加↔編集の切替時にフォームの defaultValue を確実に反映させる。 */}
+        <form action={submit} key={current?.id ?? 'new'}>
+          {current && <input type="hidden" name="id" value={current.id} />}
+          <Field label={t.formName}><TextInput name="name" required placeholder={t.formName} defaultValue={current?.name ?? ''} /></Field>
           <FieldRow>
-            <Field label={t.formInitial}><TextInput name="initial" maxLength={2} placeholder="A" /></Field>
-            <Field label={t.formWeeklyHours}><TextInput type="number" name="weekly_hours" min={0} defaultValue={40} /></Field>
+            <Field label={t.formInitial}><TextInput name="initial" maxLength={2} placeholder="A" defaultValue={current?.initial ?? ''} /></Field>
+            <Field label={t.formWeeklyHours}><TextInput type="number" name="weekly_hours" min={0} defaultValue={current?.weeklyHours ?? 40} /></Field>
           </FieldRow>
+          <Field label={t.formEmail}><TextInput type="email" name="email" placeholder={t.formEmail} defaultValue={current?.email ?? ''} /></Field>
+          <div style={{ fontSize: 11, color: 'var(--ink3)', lineHeight: 1.6, margin: '-4px 0 14px' }}>{t.formEmailStaffHint}</div>
           <Field label={t.formTone}>
-            <Select name="tone" defaultValue="accent">
+            <Select name="tone" defaultValue={current?.tone ?? 'accent'}>
               {TONE_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>{t[o.labelKey]}</option>
               ))}
             </Select>
           </Field>
-          <FormActions cancelLabel={t.formCancel} saveLabel={t.formSave} onCancel={() => setOpen(false)} pending={pending} />
+          <FormActions cancelLabel={t.formCancel} saveLabel={t.formSave} onCancel={() => setEditing(null)} pending={pending} />
         </form>
       </Modal>
 
@@ -55,11 +63,32 @@ export function SettingsView({ staff }: { staff: Staff[] }) {
         {staff.map((s, idx) => (
           <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '15px 0', borderBottom: idx === staff.length - 1 ? 'none' : '1px solid var(--line)' }}>
             <Avatar initial={s.initial} tone={s.tone} size={38} />
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 14, fontWeight: 500 }}>{s.name}</div>
-              <div style={{ fontSize: 11.5, color: 'var(--ink3)' }}>{t.weeklyShort} {s.weeklyHours}h</div>
+              <div style={{ fontSize: 11.5, color: 'var(--ink3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {s.email ? s.email : `${t.weeklyShort} ${s.weeklyHours}h`}
+              </div>
             </div>
-            <span style={{ fontSize: 11, padding: '4px 11px', borderRadius: 999, background: 'var(--accent-soft)', color: 'var(--accent)' }}>{s.id}</span>
+            <span
+              style={{
+                fontSize: 11,
+                padding: '4px 11px',
+                borderRadius: 999,
+                background: s.linked ? 'var(--sage-soft)' : 'var(--line)',
+                color: s.linked ? 'var(--sage)' : 'var(--ink3)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {s.linked ? t.staffLinked : t.staffUnlinked}
+            </span>
+            {canManage && (
+              <button
+                onClick={() => setEditing(s)}
+                style={{ font: '600 12px var(--ui)', background: '#fff', color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: 999, padding: '6px 14px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+              >
+                {t.staffEdit}
+              </button>
+            )}
           </div>
         ))}
       </div>

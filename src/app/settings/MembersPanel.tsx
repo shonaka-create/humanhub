@@ -130,6 +130,7 @@ export function MembersPanel({ bundle, baseUrl }: { bundle: MembersBundle; baseU
             </select>
             <button type="submit" disabled={pending} style={primaryBtn}>{t.memberInviteSend}</button>
           </form>
+          <div style={{ fontSize: 11.5, color: 'var(--ink3)', marginTop: 8, lineHeight: 1.6 }}>{t.memberInviteHint}</div>
 
           {invites.length > 0 && (
             <div style={{ marginTop: 16 }}>
@@ -141,8 +142,8 @@ export function MembersPanel({ bundle, baseUrl }: { bundle: MembersBundle; baseU
                       <div style={{ fontSize: 13 }}>{iv.email}</div>
                     </div>
                     <RoleChip role={iv.role} label={roleLabel(iv.role)} />
-                    <button type="button" onClick={() => copyLink(iv.token)} style={ghostBtn}>
-                      {copied === iv.token ? '✓' : t.memberCopyLink}
+                    <button type="button" onClick={() => copyLink(iv.token)} style={copyBtn}>
+                      {copied === iv.token ? `✓ ${t.memberCopyLink}` : `🔗 ${t.memberCopyLink}`}
                     </button>
                     <button
                       type="button"
@@ -187,14 +188,16 @@ const primaryBtn: React.CSSProperties = {
   cursor: 'pointer',
 };
 
-const ghostBtn: React.CSSProperties = {
-  border: '1px solid var(--line)',
+// 招待運用の主導線（リンクをコピーして自分で送る）。目立たせる。
+const copyBtn: React.CSSProperties = {
+  border: '1px solid var(--accent)',
   borderRadius: 999,
-  padding: '6px 12px',
-  background: '#fff',
-  color: 'var(--ink2)',
-  font: '12px var(--ui)',
+  padding: '6px 14px',
+  background: 'var(--accent-soft)',
+  color: 'var(--accent)',
+  font: '600 12px var(--ui)',
   cursor: 'pointer',
+  whiteSpace: 'nowrap',
 };
 
 const dangerBtn: React.CSSProperties = {
