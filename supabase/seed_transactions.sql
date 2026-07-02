@@ -4,6 +4,13 @@
 
 truncate table transactions restart identity;
 
+-- seed 中は auth.uid() が無いため、tenant_id にデモサロンを一時デフォルトとして与える。
+-- （seed.sql が先に「デモサロン」テナントを作成している前提。無ければここで作る。）
+insert into tenants (id, name) values
+  ('00000000-0000-0000-0000-0000000000aa', 'デモサロン')
+  on conflict (id) do nothing;
+alter table transactions alter column tenant_id set default '00000000-0000-0000-0000-0000000000aa';
+
 -- ===== 当月（2026-06）: 詳細トランザクション =====
 insert into transactions (txn_date, customer_name, staff_id, service_key, category, amount) values
   ('2026-06-02', '山田 花子',    'emma', 'svcCutColor', 'service', 245),
@@ -53,3 +60,5 @@ insert into transactions (txn_date, customer_name, staff_id, service_key, catego
   ('2026-05-09', '常連A', 'emma', 'svcColor',    'service', 5500),
   ('2026-05-16', '常連B', 'yuki', 'svcCutColor', 'service', 5450),
   ('2026-05-22', '常連C', 'aoi',  'svcSpa',      'service', 5500);
+
+alter table transactions alter column tenant_id drop default;

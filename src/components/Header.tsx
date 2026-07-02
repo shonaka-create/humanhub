@@ -4,11 +4,13 @@ import { usePathname } from 'next/navigation';
 import { useLang } from '@/i18n/LangProvider';
 import { navItemForPath } from '@/lib/nav';
 import { signout } from '@/app/login/actions';
+import type { CurrentUser } from '@/lib/data';
 
-export function Header({ onMenu }: { onMenu?: () => void }) {
+export function Header({ user, onMenu }: { user: CurrentUser | null; onMenu?: () => void }) {
   const pathname = usePathname();
   const { t } = useLang();
   const title = t[navItemForPath(pathname).labelKey];
+  const tenantName = user?.tenantName?.trim();
 
   return (
     <header
@@ -48,7 +50,24 @@ export function Header({ onMenu }: { onMenu?: () => void }) {
           <path d="M4 6h16M4 12h16M4 18h16" strokeLinecap="round" />
         </svg>
       </button>
-      <h1 style={{ fontFamily: 'var(--serif)', fontSize: 24, fontWeight: 600, margin: 0, lineHeight: 1 }}>{title}</h1>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
+        {tenantName && (
+          <span
+            style={{
+              fontSize: 11.5,
+              fontWeight: 600,
+              letterSpacing: 0.3,
+              color: 'var(--accent)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {tenantName}
+          </span>
+        )}
+        <h1 style={{ fontFamily: 'var(--serif)', fontSize: 24, fontWeight: 600, margin: 0, lineHeight: 1 }}>{title}</h1>
+      </div>
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 18 }}>
         <div
           className="header-search"

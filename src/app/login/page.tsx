@@ -5,9 +5,9 @@ import CheckEmail from './CheckEmail';
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; message?: string; email?: string }>;
+  searchParams: Promise<{ error?: string; message?: string; email?: string; invite?: string }>;
 }) {
-  const { error, message, email } = await searchParams;
+  const { error, message, email, invite } = await searchParams;
   const showCheckEmail = message === 'signup';
 
   return (
@@ -51,7 +51,7 @@ export default async function LoginPage({
             margin: '0 0 28px',
           }}
         >
-          サロン管理システム ログイン
+          サロン管理システム
         </p>
 
         {showCheckEmail ? (
@@ -59,7 +59,7 @@ export default async function LoginPage({
         ) : (
           <>
             <FlashMessage error={error} message={message} />
-            <LoginForm />
+            <LoginForm inviteToken={invite} />
           </>
         )}
       </div>

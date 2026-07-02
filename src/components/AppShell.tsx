@@ -27,7 +27,7 @@ export function AppShell({ children, user }: { children: React.ReactNode; user: 
         aria-hidden
       />
       <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
-        <Header onMenu={() => setNavOpen(true)} />
+        <Header user={user} onMenu={() => setNavOpen(true)} />
         <div className="app-content" style={{ flex: 1, overflowY: 'auto', padding: '32px 40px 64px' }}>
           {children}
         </div>

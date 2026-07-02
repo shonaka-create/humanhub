@@ -10,12 +10,60 @@ export type Tone = 'accent' | 'sage' | 'rose';
 /** Keys into the i18n dictionary (used for translatable labels in data). */
 export type LabelKey = keyof Dict;
 
+/** アカウント権限。オーナーは全編集＋給与確定、スタッフは自分の情報のみ。 */
+export type StaffRole = 'owner' | 'staff';
+
 export type Staff = {
   id: string;
   name: string;
   initial: string;
   tone: Tone;
   weeklyHours: number;
+};
+
+/** 給与テーブル1件（スタッフ×適用開始日）。金額は円。 */
+export type PayRate = {
+  id: string;
+  staffId: string;
+  effectiveFrom: string;
+  hourlyWage: number;
+  commuteAllowance: number;
+  otherAllowance: number;
+  note: string;
+};
+
+/** シフト実績の状態。worked=出勤 / off=休み / paid_leave=有給。 */
+export type ShiftStatus = 'worked' | 'off' | 'paid_leave';
+
+/** 日付ベースのシフト実績1件（給与の実働時間の源泉）。 */
+export type ShiftEntry = {
+  id: string;
+  staffId: string;
+  date: string;
+  start: string;
+  end: string;
+  breakMin: number;
+  status: ShiftStatus;
+  note: string;
+  tone: Tone;
+};
+
+/** 週グリッドの1セル（該当日の実績、無ければ null）。 */
+export type ShiftEntryCell = {
+  id: string;
+  start: string;
+  end: string;
+  breakMin: number;
+  status: ShiftStatus;
+  tone: Tone;
+  note: string;
+} | null;
+
+/** 週グリッドのスタッフ1行（days は Mon..Sun、workedMin は当週の実働合計分）。 */
+export type ShiftWeekRow = {
+  staff: { id: string; initial: string; name: string; tone: Tone };
+  days: ShiftEntryCell[];
+  workedMin: number;
 };
 
 export type ScheduleEntry = {

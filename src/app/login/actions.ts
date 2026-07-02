@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { ensureMembership } from '@/lib/tenant';
 
 export async function login(formData: FormData) {
   const supabase = await createClient();
@@ -39,23 +40,34 @@ export async function signup(formData: FormData) {
   const email = String(formData.get('email') ?? '');
   const displayName = String(formData.get('display_name') ?? '').trim();
   const initial = (displayName[0] ?? 'U').toUpperCase();
+  const salonName = String(formData.get('salon_name') ?? '').trim();
+  const inviteToken = String(formData.get('invite_token') ?? '').trim();
   const { data, error } = await supabase.auth.signUp({
     email,
     password: String(formData.get('password') ?? ''),
     options: {
-      // 表示名はユーザーメタデータに保存し、サイドバー/挨拶文に反映する。
-      data: { display_name: displayName, initial },
+      // 表示名・登録意図（新規サロン名／招待トークン）をメタデータに退避する。
+      // ロール自体はここに置かない（本人が書き換え可能なため）。実際の権限は
+      // membership 作成時に、招待トークンを invites テーブルで検証して決まる。
+      data: {
+        display_name: displayName,
+        initial,
+        pending_salon_name: salonName || null,
+        pending_invite_token: inviteToken || null,
+      },
     },
   });
   if (error) {
     redirect(`/login?error=${encodeURIComponent(friendlyAuthError(error.message))}`);
   }
-  // メール確認が無効なら signUp 時点でセッションが発行される → そのままアプリへ。
-  if (data.session) {
+  // メール確認が無効なら signUp 時点でセッションが発行される → membership を用意してアプリへ。
+  if (data.session && data.user) {
+    await ensureMembership(data.user);
     revalidatePath('/', 'layout');
     redirect('/');
   }
   // 確認が有効な場合は確認メール待ち → 確認案内画面へ。
+  // membership は初回ログイン時（getCurrentUser）に用意される。
   redirect(`/login?message=signup&email=${encodeURIComponent(email)}`);
 }
 

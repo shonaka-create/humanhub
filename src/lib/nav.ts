@@ -6,6 +6,7 @@ export type NavKey =
   | 'reservation'
   | 'customer'
   | 'sales'
+  | 'payroll'
   | 'inventory'
   | 'access'
   | 'settings';
@@ -15,6 +16,8 @@ export type NavItem = {
   href: string;
   labelKey: LabelKey;
   pro?: boolean;
+  /** オーナーのみに表示するメニュー。 */
+  ownerOnly?: boolean;
 };
 
 export const NAV: NavItem[] = [
@@ -23,6 +26,7 @@ export const NAV: NavItem[] = [
   { key: 'reservation', href: '/bookings', labelKey: 'navReservation' },
   { key: 'customer', href: '/customers', labelKey: 'navCustomer' },
   { key: 'sales', href: '/sales', labelKey: 'navSales' },
+  { key: 'payroll', href: '/payroll', labelKey: 'navPayroll' },
   { key: 'inventory', href: '/inventory', labelKey: 'navInventory' },
   { key: 'access', href: '/access', labelKey: 'navAccess', pro: true },
   { key: 'settings', href: '/settings', labelKey: 'navSettings' },

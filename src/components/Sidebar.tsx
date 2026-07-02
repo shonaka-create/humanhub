@@ -39,6 +39,13 @@ const icons: Record<NavKey, React.ReactNode> = {
       <path d="M8 15l3.5-4 3 2.5L20 7" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   ),
+  payroll: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="2.5" y="6" width="19" height="12" rx="2" />
+      <circle cx="12" cy="12" r="2.6" />
+      <path d="M6 9.5v5M18 9.5v5" strokeLinecap="round" />
+    </svg>
+  ),
   inventory: (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
       <path d="M3 7.5l9-4.5 9 4.5v9l-9 4.5-9-4.5z" strokeLinejoin="round" />
@@ -108,7 +115,7 @@ export function Sidebar({
       </div>
 
       <nav style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-        {NAV.map((item) => {
+        {NAV.filter((item) => !item.ownerOnly || user?.role === 'owner').map((item) => {
           const active = item.key === activeKey;
           return (
             <Link

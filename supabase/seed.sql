@@ -3,11 +3,31 @@
 -- 何度流しても安全なように冒頭で truncate する。
 
 truncate table
-  customer_memos, follow_ups, bookings, shifts,
+  customer_memos, follow_ups, bookings, shift_entries, shifts,
   orders, inventory_items, customers, services, staff
 restart identity cascade;
 
+-- ===== マルチテナント: デモ用テナント =====
+-- seed 実行時は auth.uid() が無く tenant_id 自動補完トリガーが効かない。
+-- そこで各業務テーブルの tenant_id に「デモサロン」を一時デフォルトとして与え、
+-- 以降の insert 群（tenant_id 未指定）をそのまま通す。末尾でデフォルトは解除する。
+insert into tenants (id, name) values
+  ('00000000-0000-0000-0000-0000000000aa', 'デモサロン')
+  on conflict (id) do nothing;
+
+alter table staff           alter column tenant_id set default '00000000-0000-0000-0000-0000000000aa';
+alter table customers       alter column tenant_id set default '00000000-0000-0000-0000-0000000000aa';
+alter table customer_memos  alter column tenant_id set default '00000000-0000-0000-0000-0000000000aa';
+alter table follow_ups      alter column tenant_id set default '00000000-0000-0000-0000-0000000000aa';
+alter table bookings        alter column tenant_id set default '00000000-0000-0000-0000-0000000000aa';
+alter table shifts          alter column tenant_id set default '00000000-0000-0000-0000-0000000000aa';
+alter table shift_entries   alter column tenant_id set default '00000000-0000-0000-0000-0000000000aa';
+alter table inventory_items alter column tenant_id set default '00000000-0000-0000-0000-0000000000aa';
+alter table orders          alter column tenant_id set default '00000000-0000-0000-0000-0000000000aa';
+
 -- ===== staff =====
+-- ロールは memberships が正（マルチテナント）。ログインする施術者は運用時に
+-- staff.user_id を各自の auth ユーザー UUID に紐付ける（例: update staff set user_id='...' where id='yuki';）。
 insert into staff (id, name, initial, tone, weekly_hours) values
   ('emma',   'Emma',   'E', 'sage',   32),
   ('aoi',    'Aoi',    'A', 'accent', 30),
@@ -85,6 +105,15 @@ insert into shifts (staff_id, weekday, start_time, end_time, tone) values
   ('sophie', 2, '10:00', '15:00', 'sage'),
   ('sophie', 5, '10:00', '18:00', 'accent');
 
+-- ===== shift_entries (テンプレから 2026-06-22〜2026-07-19 の4週間を生成) =====
+-- isodow: 1=月..7=日 → shifts.weekday(0=月..6=日) は isodow-1。
+insert into shift_entries (staff_id, work_date, start_time, end_time, tone)
+select s.staff_id, d::date, s.start_time, s.end_time, s.tone
+from shifts s
+cross join generate_series('2026-06-22'::date, '2026-07-19'::date, interval '1 day') as d
+where s.weekday = (extract(isodow from d)::int - 1)
+on conflict (staff_id, work_date) do nothing;
+
 -- ===== inventory_items =====
 insert into inventory_items (name, category_key, stock, capacity, reorder_pt, status) values
   ('カラー剤 6N',          'catColor',  3,  25,  10, 'order'),
@@ -102,3 +131,15 @@ insert into orders (item, qty, supplier, order_date, eta, status) values
   ('ヘアオイル（店販）',   '12',   'Aroma Co.','2026-06-27', '2026-07-01', 'ordered'),
   ('トリートメント剤',     '12',   'B-Cosme',  '2026-06-24', '2026-06-27', 'arrived'),
   ('シャンプー（業務用）', '24',   'SalonPro', '2026-06-20', '2026-06-23', 'arrived');
+
+-- ===== 一時デフォルトの解除 =====
+-- 本番運用では tenant_id は自動補完トリガー（ログインユーザーの所属）or 明示指定で決める。
+alter table staff           alter column tenant_id drop default;
+alter table customers       alter column tenant_id drop default;
+alter table customer_memos  alter column tenant_id drop default;
+alter table follow_ups      alter column tenant_id drop default;
+alter table bookings        alter column tenant_id drop default;
+alter table shifts          alter column tenant_id drop default;
+alter table shift_entries   alter column tenant_id drop default;
+alter table inventory_items alter column tenant_id drop default;
+alter table orders          alter column tenant_id drop default;
